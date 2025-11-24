@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import numpy as np
+
+
+class EKF:
+    def __init__(self):
+        # State vector: [q0, q1, q2, q3] (quaternion)
+        self.x = np.array([1.0, 0.0, 0.0, 0.0])
+        # Covariance matrix
+        self.P = np.eye(4) * 0.1
+        # Process noise covariance
+        self.Q = np.eye(4) * 0.001
+        # Measurement noise covariance
+        self.R_acc = np.diag([0.000461, 0.001021, 0.001604])
+        self.R_mag = np.diag([0.0, 0.0, 0.0])
+
+    def predict(self, gyro, dt):
+        '''
+        Predict the next state using gyroscope data.
+        gyro: [wx, wy, wz] (rad/s)
+        dt: time step (s)
+        '''
+        wx, wy, wz = gyro
+
+        Omega = np.array([[0, -wx, -wy, -wz], [wx, 0, wz, -wy], [wy, -wz, 0, wx], [wz, wy, -wx, 0]])
+
+        F = np.eye(4) + 0.5 * Omega * dt
+
+        self.x = np.dot(F, self.x)
+
+        self.x /= np.linalg.norm(self.x)
+
+        self.P = np.dot(np.dot(F, self.P), F.T) + self.Q
+
+    def update(self, measurement, reference_vector, R_noise):
+        '''
+        Common update step for both accelerometer and magnetometer.
+        measurement: measured vector [mx, my, mz]
+        reference_vector: reference vector in the inertial frame
+        R_noise: measurement noise covariance matrix
+        '''
+        # Normalize measurement and reference vector
+        z = measurement / np.linalg.norm(measurement)
+        ref = reference_vector / np.linalg.norm(reference_vector)
+
+        # h(x) = R(q).T * ref
+        h_x = self.rotate_vector_by_quaternion_inverse(ref, self.x)
+
+        # 2. Jacobian H (partial h(x))
+        H = self.calculate_jacobian(ref, self.x)
+
+        # 3. Kalman Gain (K)
+        # S = H * P * H.T + R
+        S = np.dot(np.dot(H, self.P), H.T) + R_noise
+        # K = P * H.T * inv(S)
+        K = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
+
+        # 4. x = x + K * (z - h(x))
+        y = z - h_x # Residual
+        self.x = self.x + np.dot(K, y)
+        
+        # Normalize again
+        self.x /= np.linalg.norm(self.x)
+
+        # 5. Update covariance P = (I - K * H) * P
+        I_ = np.eye(4)
+        self.P = np.dot((I_ - np.dot(K, H)), self.P)
+
+    def rotate_vector_by_quaternion_inverse(self, v, q):
+        '''
+        Rotate vector v by the inverse of quaternion q.
+        v: 3D vector
+        q: quaternion [qw, qx, qy, qz]
+        '''
+        qw, qx, qy, qz = q
+        vx, vy, vz = v
+
+        rw =  qx*vx + qy*vy + qz*vz
+        rx =  qw*vx - qz*vy + qy*vz
+        ry =  qw*vy + qz*vx - qx*vz
+        rz =  qw*vz - qy*vx + qx*vy
+
+        tx =  rw*qx + rx*qw + ry*qz - rz*qy
+        ty =  rw*qy - rx*qz + ry*qw + rz*qx
+        tz =  rw*qz + rx*qy - ry*qx + rz*qw
+        return np.array([tx, ty, tz])
+    
+    def calculate_jacobian(self, ref, q):
+        '''
+        Calculate the Jacobian matrix H (3x4). 
+        This is h(x) partial derivative with respect to quaternion q.
+        ref: reference vector in inertial frame [rx, ry, rz]
+        q: quaternion [qw, qx, qy, qz]
+        '''
+        rx, ry, rz = ref
+        qw, qx, qy, qz = q
+
+        H = np.zeros((3, 4))
+        
+        # Row 1 (d/dx, d/dy, d/dz of x_sensor)
+        H[0, 0] =  qx*rx + qy*ry + qz*rz # d/dqw
+        H[0, 1] =  qw*rx - qz*ry + qy*rz # d/dqx
+        H[0, 2] =  qz*rx + qw*ry - qx*rz # d/dqy
+        H[0, 3] = -qy*rx + qx*ry + qw*rz # d/dqz
+        
+        H = 2 * np.array([
+            [ qx*rx + qy*ry + qz*rz,  qw*rx - qz*ry + qy*rz,  qz*rx + qw*ry - qx*rz, -qy*rx + qx*ry + qw*rz],
+            [-qz*rx + qw*ry - qx*rz,  qy*rx - qx*ry - qw*rz,  qw*rx + qz*ry - qy*rz, -qx*rx - qy*ry + qz*rz],
+            [ qy*rx - qx*ry - qw*rz,  qz*rx - qw*ry + qx*rz,  qw*rx - qz*ry + qy*rz,  qx*rx + qy*ry + qz*rz]
+        ])
+        
+        # For specific case of gravity reference vector [0, 0, 1]
+        if np.allclose(ref, [0, 0, 1]):
+             H = 2 * np.array([
+                [-qy,  qz, -qw,  qx],
+                [ qx,  qw,  qz,  qy],
+                [ qw, -qx, -qy,  qz]
+            ])
+            
+        return H

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>imu_mouse</name>
+  <version>0.0.0</version>
+  <description>The imu_mouse package</description>
+
+  <maintainer email="mrlrobot@todo.todo">mrlrobot</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf</depend>
+
+</package>
