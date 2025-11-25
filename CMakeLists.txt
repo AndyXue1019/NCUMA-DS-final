@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 
-catkin_package(
+catkin_package(CATKIN_DEPENDS
   rospy
   sensor_msgs
   geometry_msgs
