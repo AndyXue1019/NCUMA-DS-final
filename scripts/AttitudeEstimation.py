@@ -41,23 +41,32 @@ class AttitudeEstimationNode:
             rospy.logwarn('Non-positive time difference detected, skipping frame.')
             return
         
-        gryo = np.array([
+        raw_gyro = np.array([
             imu_msg.angular_velocity.x,
             imu_msg.angular_velocity.y,
             imu_msg.angular_velocity.z
         ])
-        acc = np.array([
+        raw_acc = np.array([
             imu_msg.linear_acceleration.x,
             imu_msg.linear_acceleration.y,
             imu_msg.linear_acceleration.z
         ])
-        mag = np.array([
+        raw_mag = np.array([
             mag_msg.magnetic_field.x,
             mag_msg.magnetic_field.y,
             mag_msg.magnetic_field.z
         ])
 
-        self.ekf.predict(gryo, dt)
+        # Coordinate Transformation
+        # New_X = -Raw_Z
+        # New_Y = -Raw_Y
+        # New_Z = -Raw_X
+        gyro = np.array([ -raw_gyro[2], -raw_gyro[1], -raw_gyro[0] ])
+        acc  = np.array([ -raw_acc[2],  -raw_acc[1],  -raw_acc[0]  ])
+        mag  = np.array([ -raw_mag[2],  -raw_mag[1],  -raw_mag[0]  ])
+
+
+        self.ekf.predict(gyro, dt)
         self.ekf.update(acc, np.array([0, 0, 1]), self.ekf.R_acc)
 
         if np.linalg.norm(mag) > 1e-6:
