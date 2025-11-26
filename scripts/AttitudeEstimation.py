@@ -72,7 +72,7 @@ class AttitudeEstimationNode:
         if np.linalg.norm(mag) > 1e-6:
              self.ekf.update(mag, np.array([1, 0, 0]), self.ekf.R_mag)
 
-        print('Estimated Quaternion:', self.ekf.x)
+        # print('Estimated Quaternion:', self.ekf.x)
         self.publish_pose()
 
     def publish_pose(self):
