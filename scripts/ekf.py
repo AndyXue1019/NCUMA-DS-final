@@ -13,7 +13,7 @@ class EKF:
         self.Q = np.eye(4) * 0.001
         # Measurement noise covariance
         self.R_acc = np.diag([0.000461, 0.001021, 0.001604])
-        self.R_mag = np.diag([0.0, 0.0, 0.0])
+        self.R_mag = np.diag([1e-8, 1e-8, 1e-8])
 
     def predict(self, gyro, dt):
         '''
