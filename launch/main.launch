@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="imu_mouse" type="mouse_control.py" name="mouse_control_node" output="screen" required="true"/>
+    <node pkg="imu_mouse" type="AttitudeEstimation.py" name="attitude_estimation_node" output="screen" required="true"/>
+</launch>
