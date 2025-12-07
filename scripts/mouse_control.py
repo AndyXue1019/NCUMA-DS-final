@@ -16,10 +16,10 @@ class MouseControlNode:
         rospy.init_node('mouse_control_node', anonymous=True)
 
         # Deadzone: Prevent small movements from affecting the mouse
-        self.DEADZONE = 0.08  # 約 4.5 度
+        self.DEADZONE = 0.04  # Radians
         # Gain: The higher the value, the faster the mouse moves
-        self.SPEED_GAIN_X = 1500.0
-        self.SPEED_GAIN_Y = 1500.0
+        self.SPEED_GAIN_X = 40.0
+        self.SPEED_GAIN_Y = 40.0
 
         # [Click Parameters]
         # Jerk threshold: Acceleration change above this value is considered a tap
@@ -36,21 +36,56 @@ class MouseControlNode:
         self.last_click_time = rospy.Time.now()
         self.current_roll = 0.0  # For right click detection
 
+        self.is_initialized = False
+        self.initialization_time = None
+        self.WARMUP_DURATION = 3.0
+
+        self.initial_roll = None
+        self.initial_pitch = None
+
         # x=Roll, y=Pitch, z=Yaw
         rospy.Subscriber('/imu/pose/filtered', Vector3, self.pose_callback)
 
         rospy.Subscriber('/imu/data_raw', Imu, self.raw_callback)
 
         rospy.loginfo('Mouse Control Node Started!')
-        rospy.loginfo('Mode: Joystick Control (Tilt to move)')
 
     def pose_callback(self, msg: Vector3):
         """
         Process filtered attitude -> Move mouse
         msg: Vector3 (x=Roll, y=Pitch, z=Yaw) unit: rad
         """
-        roll = msg.x
-        pitch = msg.y
+        curr_time = rospy.Time.now()
+
+        if not self.is_initialized:
+            self.is_initialized = True
+            self.initialization_time = curr_time
+            rospy.loginfo('Connection established. Warming up EKF for 3 seconds...')
+            return
+
+        elapsed = (curr_time - self.initialization_time).to_sec()
+
+        if elapsed < self.WARMUP_DURATION:
+            if int(elapsed * 10) % 10 == 0:
+                rospy.loginfo(f'Warming up... {elapsed:.1f}/{self.WARMUP_DURATION}')
+            return
+
+        if math.isnan(msg.x) and math.isnan(msg.y):
+            rospy.logwarn('Received NaN in attitude data, skipping mouse movement.')
+            return
+
+        if self.initial_roll is None:
+            self.initial_roll = msg.x
+            self.initial_pitch = msg.y
+            rospy.loginfo(
+                'EKF Settled! Zero point set at Roll: '
+                f'{self.initial_roll:.2f}, Pitch: {self.initial_pitch:.2f}'
+            )
+            rospy.loginfo('Mouse Control ACTIVE!')
+            return
+
+        roll = msg.x - self.initial_roll
+        pitch = msg.y - self.initial_pitch
 
         self.current_roll = roll
 
@@ -70,10 +105,15 @@ class MouseControlNode:
         vel_x = math.copysign(roll**2, roll) * self.SPEED_GAIN_X
         vel_y = math.copysign(pitch**2, pitch) * self.SPEED_GAIN_Y
 
+        print(
+            f'Roll: {msg.x:.3f} rad, Pitch: {msg.y:.3f} rad\n'
+            f'-> Move Mouse: dx={int(-vel_x)}, dy={int(vel_y)}'
+        )
+
         # Move mouse
         try:
             # move(dx, dy) is relative movement
-            self.mouse.move(int(vel_x), int(-vel_y))
+            self.mouse.move(int(-vel_x), int(vel_y))
         except Exception:
             pass
 
@@ -120,6 +160,7 @@ class MouseControlNode:
         else:
             rospy.loginfo('LEFT CLICK! (Jerk detected)')
             self.mouse.click(Button.left, 1)
+
 
 if __name__ == '__main__':
     try:
