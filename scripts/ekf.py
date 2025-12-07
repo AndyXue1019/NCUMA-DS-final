@@ -33,7 +33,7 @@ class EKF:
 
         self.P = np.dot(np.dot(F, self.P), F.T) + self.Q
 
-    def update(self, measurement, reference_vector, R_noise):
+    def update(self, measurement: np.ndarray, reference_vector: np.ndarray, R_noise: np.ndarray):
         '''
         Common update step for both accelerometer and magnetometer.
         measurement: measured vector [mx, my, mz]
@@ -41,6 +41,9 @@ class EKF:
         R_noise: measurement noise covariance matrix
         '''
         # Normalize measurement and reference vector
+        if measurement.all() == 0.0:
+            print('Invalid measurement vector, skipping update.')
+            return  # Invalid measurement, skip update
         z = measurement / np.linalg.norm(measurement)
         ref = reference_vector / np.linalg.norm(reference_vector)
 
