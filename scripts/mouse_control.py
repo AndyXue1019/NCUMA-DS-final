@@ -84,8 +84,8 @@ class MouseControlNode:
             rospy.loginfo('Mouse Control ACTIVE!')
             return
 
-        roll = msg.x - self.initial_roll
-        pitch = msg.y - self.initial_pitch
+        roll = self.normalize_angle(msg.x - self.initial_roll)
+        pitch = self.normalize_angle(msg.y - self.initial_pitch)
 
         self.current_roll = roll
 
@@ -160,6 +160,16 @@ class MouseControlNode:
         else:
             rospy.loginfo('LEFT CLICK! (Jerk detected)')
             self.mouse.click(Button.left, 1)
+
+    def normalize_angle(self, angle):
+        """
+        Normalize angle to [-pi, pi]
+        """
+        while angle > math.pi:
+            angle -= 2 * math.pi
+        while angle < -math.pi:
+            angle += 2 * math.pi
+        return angle
 
 
 if __name__ == '__main__':
