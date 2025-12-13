@@ -41,10 +41,11 @@ class EKF:
         R_noise: measurement noise covariance matrix
         '''
         # Normalize measurement and reference vector
-        if measurement.all() == 0.0:
+        meas_norm = np.linalg.norm(measurement)
+        if meas_norm < 1e-6:
             print('Invalid measurement vector, skipping update.')
             return  # Invalid measurement, skip update
-        z = measurement / np.linalg.norm(measurement)
+        z = measurement / meas_norm
         ref = reference_vector / np.linalg.norm(reference_vector)
 
         # h(x) = R(q).T * ref
@@ -101,24 +102,30 @@ class EKF:
 
         H = np.zeros((3, 4))
         
-        # Row 1 (d/dx, d/dy, d/dz of x_sensor)
-        H[0, 0] =  qx*rx + qy*ry + qz*rz # d/dqw
-        H[0, 1] =  qw*rx - qz*ry + qy*rz # d/dqx
-        H[0, 2] =  qz*rx + qw*ry - qx*rz # d/dqy
-        H[0, 3] = -qy*rx + qx*ry + qw*rz # d/dqz
-        
-        H = 2 * np.array([
-            [ qx*rx + qy*ry + qz*rz,  qw*rx - qz*ry + qy*rz,  qz*rx + qw*ry - qx*rz, -qy*rx + qx*ry + qw*rz],
-            [-qz*rx + qw*ry - qx*rz,  qy*rx - qx*ry - qw*rz,  qw*rx + qz*ry - qy*rz, -qx*rx - qy*ry + qz*rz],
-            [ qy*rx - qx*ry - qw*rz,  qz*rx - qw*ry + qx*rz,  qw*rx - qz*ry + qy*rz,  qx*rx + qy*ry + qz*rz]
-        ])
-        
-        # For specific case of gravity reference vector [0, 0, 1]
+        # Case 1: 重力 (Accelerometer) - Ref [0, 0, 1]
         if np.allclose(ref, [0, 0, 1]):
              H = 2 * np.array([
                 [-qy,  qz, -qw,  qx],
                 [ qx,  qw,  qz,  qy],
                 [ qw, -qx, -qy,  qz]
+            ])
+            
+        # Case 2: 磁北 (Magnetometer) - Ref [1, 0, 0] 
+        elif np.allclose(ref, [1, 0, 0]):
+            H = 2 * np.array([
+                [ 0,   0,  -2*qy, -2*qz],
+                [-qz,  qy,  qx,   -qw  ],
+                [ qy,  qz,  qw,    qx  ]
+            ])
+            
+        # Case 3: Fallback (Generic formula)
+        # 如果不是上述兩個向量，使用通用公式
+        else:
+            rx, ry, rz = ref
+            H = 2 * np.array([
+                [ qx*rx + qy*ry + qz*rz,  qw*rx - qz*ry + qy*rz,  qz*rx + qw*ry - qx*rz, -qy*rx + qx*ry + qw*rz],
+                [-qz*rx + qw*ry - qx*rz,  qy*rx - qx*ry - qw*rz,  qw*rx + qz*ry - qy*rz, -qx*rx - qy*ry + qz*rz],
+                [ qy*rx - qx*ry - qw*rz,  qz*rx - qw*ry + qx*rz,  qw*rx - qz*ry + qy*rz,  qx*rx + qy*ry + qz*rz]
             ])
             
         return H
