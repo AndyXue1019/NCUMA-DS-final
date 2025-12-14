@@ -68,8 +68,7 @@ class EKF:
         self.x /= np.linalg.norm(self.x)
 
         # 5. Update covariance P = (I - K * H) * P
-        I_ = np.eye(4)
-        self.P = np.dot((I_ - np.dot(K, H)), self.P)
+        self.P = np.dot((np.eye(4) - np.dot(K, H)), self.P)
 
     def rotate_vector_by_quaternion_inverse(self, v, q):
         '''
