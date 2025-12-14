@@ -32,9 +32,7 @@ class MagVisualizer:
         self.min_vals = np.array([float('inf')] * 3)
         self.max_vals = np.array([float('-inf')] * 3)
 
-        rospy.loginfo(
-            'Mag Visualizer Started! Please rotate your IMU in all directions.'
-        )
+        rospy.loginfo('Mag Visualizer Started! Please rotate your IMU in all directions.')
 
     def mag_callback(self, msg):
         # 1. 取得原始數據 (這裡假設您 topic 發出來的是已經轉好座標軸的，或者是原始的)

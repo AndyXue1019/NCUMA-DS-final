@@ -101,7 +101,7 @@ class EKF:
 
         H = np.zeros((3, 4))
         
-        # Case 1: 重力 (Accelerometer) - Ref [0, 0, 1]
+        # Case 1: Gravity (Accelerometer) - Ref [0, 0, 1]
         if np.allclose(ref, [0, 0, 1]):
              H = 2 * np.array([
                 [-qy,  qz, -qw,  qx],
@@ -109,7 +109,7 @@ class EKF:
                 [ qw, -qx, -qy,  qz]
             ])
             
-        # Case 2: 磁北 (Magnetometer) - Ref [1, 0, 0] 
+        # Case 2: Magnetic North (Magnetometer) - Ref [1, 0, 0] 
         elif np.allclose(ref, [1, 0, 0]):
             H = 2 * np.array([
                 [ 0,   0,  -2*qy, -2*qz],
@@ -118,7 +118,6 @@ class EKF:
             ])
             
         # Case 3: Fallback (Generic formula)
-        # 如果不是上述兩個向量，使用通用公式
         else:
             rx, ry, rz = ref
             H = 2 * np.array([
