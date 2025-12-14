@@ -28,8 +28,10 @@ class AttitudeEstimationNode:
 
         # Gyro bias calibration
         self.gyro_bias = np.array([0.0, 0.0, 0.0])
+        self.acc_bias = np.array([0.0, 0.0, 0.0])
         self.is_calibrated = False
-        self.calibration_buffer = []
+        self.gyro_cal_buffer = []
+        self.acc_cal_buffer = []
         self.CALIBRATION_SAMPLES = 100  # Number of samples for calibration
 
         rospy.loginfo('EKF Node Started with TimeSynchronizer. Waiting for IMU data...')
@@ -72,27 +74,35 @@ class AttitudeEstimationNode:
         )
 
         if not self.is_calibrated:
-            self.calibration_buffer.append(raw_gyro)
-            if len(self.calibration_buffer) >= self.CALIBRATION_SAMPLES:
+            self.gyro_cal_buffer.append(raw_gyro)
+            self.acc_cal_buffer.append(raw_acc)
+            if len(self.gyro_cal_buffer) >= self.CALIBRATION_SAMPLES:
                 # 計算平均值作為 Bias
-                self.gyro_bias = np.mean(self.calibration_buffer, axis=0)
+                self.gyro_bias = np.mean(self.gyro_cal_buffer, axis=0)
+                avg_acc = np.mean(self.acc_cal_buffer, axis=0)
+                self.acc_bias = np.array([avg_acc[0] + 9.78908, avg_acc[1], avg_acc[2]])
+
                 self.is_calibrated = True
-                rospy.loginfo(f'Calibration Done! Gyro Bias: {self.gyro_bias}')
+                rospy.loginfo(f'Calibration Done!\n \
+                              Gyro Bias: {self.gyro_bias}\n \
+                              Acc Bias: {self.acc_bias}'
+                )
 
                 # 印出原始加速度，確認軸向
                 rospy.loginfo('========================================')
                 rospy.loginfo(f'Raw Accel when static: {raw_acc}')
                 rospy.loginfo('========================================')
             else:
-                if len(self.calibration_buffer) % 20 == 0:
-                    rospy.loginfo(f'Calibrating... {len(self.calibration_buffer)}/{self.CALIBRATION_SAMPLES}')
+                if len(self.gyro_cal_buffer) % 20 == 0:
+                    rospy.loginfo(f'Calibrating... {len(self.gyro_cal_buffer)}/{self.CALIBRATION_SAMPLES}')
                 return  # 校正期間不執行 EKF
 
         gyro_corrected = raw_gyro - self.gyro_bias
+        acc_corrected = raw_acc - self.acc_bias
 
         # Coordinate Transformation
         gyro = np.array([-gyro_corrected[2], -gyro_corrected[1], -gyro_corrected[0]])
-        acc = np.array([-raw_acc[2], -raw_acc[1], -raw_acc[0]])
+        acc = np.array([-acc_corrected[2], -acc_corrected[1], -acc_corrected[0]])
         mag = np.array([-raw_mag[2], -raw_mag[1], -raw_mag[0]])
 
         self.ekf.predict(gyro, dt)
@@ -121,7 +131,6 @@ class AttitudeEstimationNode:
 
     def publish_marker(self, q):
         marker = Marker()
-        # [重要] Frame ID 設為 "world"，等一下 Rviz 的 Fixed Frame 也要設成這個
         marker.header.frame_id = 'world'
         marker.header.stamp = rospy.Time.now()
 
@@ -137,17 +146,15 @@ class AttitudeEstimationNode:
         marker.pose.position.z = 0
 
         # 設定姿態 (從 EKF 取得的四元數)
-        # 注意: EKF 的 q 是 [w, x, y, z]，ROS msg 是 x, y, z, w
         marker.pose.orientation.w = q[0]
         marker.pose.orientation.x = q[1]
         marker.pose.orientation.y = q[2]
         marker.pose.orientation.z = q[3]
 
         # 設定尺寸 (單位: 公尺)
-        # 做成扁平狀，模擬 IMU 模組的外觀
-        marker.scale.x = 0.1  # 長 5cm (X軸-紅色)
-        marker.scale.y = 0.5  # 寬 3cm (Y軸-綠色)
-        marker.scale.z = 0.3  # 高 1cm (Z軸-藍色)
+        marker.scale.x = 0.1  # 長 1cm (X軸-紅色)
+        marker.scale.y = 0.5  # 寬 5cm (Y軸-綠色)
+        marker.scale.z = 0.3  # 高 3cm (Z軸-藍色)
 
         # 設定顏色 (RGBA)
         marker.color.r = 1.0
