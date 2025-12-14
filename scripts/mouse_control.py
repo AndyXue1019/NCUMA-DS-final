@@ -16,10 +16,10 @@ class MouseControlNode:
         rospy.init_node('mouse_control_node', anonymous=True)
 
         # Deadzone: Prevent small movements from affecting the mouse
-        self.DEADZONE = 0.04  # Radians
+        self.DEADZONE = 0.08  # Radians
         # Gain: The higher the value, the faster the mouse moves
-        self.SPEED_GAIN_X = 40.0
-        self.SPEED_GAIN_Y = 40.0
+        self.SPEED_GAIN_X = 20.0
+        self.SPEED_GAIN_Y = 20.0
 
         # [Click Parameters]
         # Jerk threshold: Acceleration change above this value is considered a tap
@@ -107,13 +107,13 @@ class MouseControlNode:
 
         print(
             f'Roll: {msg.x:.3f} rad, Pitch: {msg.y:.3f} rad\n'
-            f'-> Move Mouse: dx={int(-vel_x)}, dy={int(vel_y)}'
+            f'-> Move Mouse: dx={int(vel_x)}, dy={int(vel_y)}'
         )
 
         # Move mouse
         try:
             # move(dx, dy) is relative movement
-            self.mouse.move(int(-vel_x), int(vel_y))
+            self.mouse.move(int(vel_x), int(vel_y))
         except Exception:
             pass
 
